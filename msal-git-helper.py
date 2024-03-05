@@ -6,7 +6,6 @@
 
 # pip install msal
 from msal import PublicClientApplication
-from msal import SerializableTokenCache
 import sys
 
 # You can hard-code the registered app's client ID and tenant ID here,
@@ -16,7 +15,7 @@ tenant_id = '<tenant-id>'
 
 # Do not modify this variable. It represents the programmatic ID for
 # Azure Databricks along with the default scope of '/.default'.
-scopes = [ 'email openid User.Read' ]
+scopes = [ 'email', 'User.Read' ]  # MSAL expects a list of strings, and "openid" is used by default
 
 # Check for too few or too many command-line arguments.
 if (len(sys.argv) > 1) and (len(sys.argv) != 3):
@@ -29,28 +28,21 @@ if len(sys.argv) > 1:
   client_id = sys.argv[1]
   tenant_id = sys.argv[2]
 
-cache = SerializableTokenCache()
+## This is a one-off script. The default in-memory token cache would work just fine
+#cache = SerializableTokenCache()
 
 app = PublicClientApplication(
   client_id = client_id,
   authority = "https://login.microsoftonline.com/" + tenant_id,
-  token_cache = cache
+  #token_cache = cache
 )
 
 acquire_tokens_result = app.acquire_token_interactive(
   scopes = scopes
 )
 
-if 'error' in acquire_tokens_result:
-  print("Error: " + acquire_tokens_result['error'], file=sys.stderr)
-  print("Description: " + acquire_tokens_result['error_description'], file=sys.stderr)
+if 'id_token' in acquire_tokens_result:
+  print(acquire_tokens_result["id_token"], end='')
 else:
-  accounts = app.get_accounts()
-  account = accounts[0]
-
-  # OIDC Id token
-  id_token = cache.find(cache.CredentialType.ID_TOKEN, query={
-                       "home_account_id": account['home_account_id'],
-                   })[0]['secret']
-
-  print(id_token, end='')
+  print("Error: " + acquire_tokens_result.get('error', "unknown"), file=sys.stderr)
+  print("Description: " + acquire_tokens_result.get('error_description', "n/a"), file=sys.stderr)
